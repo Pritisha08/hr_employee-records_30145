@@ -1,0 +1,85 @@
+CREATE TABLE IF NOT EXISTS Departments (
+    department_id SERIAL PRIMARY KEY,
+    department_name VARCHAR(100) UNIQUE NOT NULL
+);
+
+-- Create the Employees table
+CREATE TABLE IF NOT EXISTS Employees (
+    employee_id SERIAL PRIMARY KEY,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    phone_number VARCHAR(20),
+    job_title VARCHAR(100) NOT NULL,
+    start_date DATE NOT NULL,
+    department_id INT,
+    FOREIGN KEY (department_id) REFERENCES Departments(department_id) ON DELETE SET NULL
+);
+
+-- Create the PerformanceReviews table
+CREATE TABLE IF NOT EXISTS PerformanceReviews (
+    review_id SERIAL PRIMARY KEY,
+    employee_id INT NOT NULL,
+    review_date DATE NOT NULL,
+    review_summary TEXT,
+    rating INT,
+    FOREIGN KEY (employee_id) REFERENCES Employees(employee_id) ON DELETE CASCADE
+);
+
+-- Create the LeaveRequests table
+CREATE TABLE IF NOT EXISTS LeaveRequests (
+    leave_id SERIAL PRIMARY KEY,
+    employee_id INT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    reason TEXT,
+    status VARCHAR(50) DEFAULT 'Pending',
+    FOREIGN KEY (employee_id) REFERENCES Employees(employee_id) ON DELETE CASCADE
+);
+
+-- Insert data into the Departments table
+INSERT INTO Departments (department_name) VALUES
+('Human Resources'),
+('Engineering'),
+('Marketing'),
+('Sales'),
+('Finance');
+
+-- Insert data into the Employees table
+INSERT INTO Employees (first_name, last_name, email, phone_number, job_title, start_date, department_id) VALUES
+('John', 'Doe', 'john.doe@example.com', '555-1234', 'Software Engineer', '2020-05-15', 2),
+('Jane', 'Smith', 'jane.smith@example.com', '555-5678', 'HR Manager', '2018-02-20', 1),
+('Emily', 'Jones', 'emily.jones@example.com', '555-8765', 'Marketing Specialist', '2021-09-01', 3),
+('Michael', 'Brown', 'michael.brown@example.com', '555-4321', 'Sales Representative', '2019-11-10', 4),
+('Jessica', 'Williams', 'jessica.williams@example.com', '555-9876', 'Financial Analyst', '2022-03-25', 5),
+('David', 'Garcia', 'david.garcia@example.com', '555-1122', 'Data Scientist', '2020-08-05', 2),
+('Sarah', 'Miller', 'sarah.miller@example.com', '555-3344', 'Recruiter', '2021-01-30', 1),
+('Chris', 'Wilson', 'chris.wilson@example.com', '555-5566', 'Marketing Manager', '2018-07-18', 3),
+('Amanda', 'Davis', 'amanda.davis@example.com', '555-7788', 'Account Executive', '2022-04-12', 4),
+('Matthew', 'Lopez', 'matthew.lopez@example.com', '555-9900', 'Accountant', '2017-10-01', 5);
+
+-- Insert data into the PerformanceReviews table
+INSERT INTO PerformanceReviews (employee_id, review_date, review_summary, rating) VALUES
+(1, '2023-01-20', 'Exceeded expectations on project delivery.', 9),
+(2, '2023-02-15', 'Solid performance, good team collaboration.', 8),
+(3, '2023-01-10', 'Great work on the recent ad campaign.', 9),
+(4, '2022-12-05', 'Met sales targets, needs improvement in lead generation.', 7),
+(5, '2023-03-01', 'Consistent and accurate financial reporting.', 8),
+(6, '2023-01-25', 'Excellent problem-solving skills.', 10),
+(7, '2023-02-20', 'Effective in screening and hiring new talent.', 8),
+(8, '2023-01-15', 'Shows strong leadership, but needs to delegate more.', 7),
+(9, '2023-03-10', 'A valuable team member with a positive attitude.', 9),
+(10, '2022-11-20', 'Attention to detail is a key strength.', 9);
+
+-- Insert data into the LeaveRequests table
+INSERT INTO LeaveRequests (employee_id, start_date, end_date, reason, status) VALUES
+(1, '2023-04-10', '2023-04-12', 'Medical appointment', 'Approved'),
+(2, '2023-05-01', '2023-05-05', 'Vacation', 'Approved'),
+(3, '2023-04-20', '2023-04-20', 'Sick day', 'Approved'),
+(4, '2023-06-01', '2023-06-03', 'Family event', 'Pending'),
+(5, '2023-07-15', '2023-07-20', 'Personal leave', 'Approved'),
+(6, '2023-04-22', '2023-04-22', 'Home repairs', 'Approved'),
+(7, '2023-08-01', '2023-08-01', 'Sick day', 'Approved'),
+(8, '2023-09-10', '2023-09-15', 'Vacation', 'Pending'),
+(9, '2023-05-20', '2023-05-21', 'Wedding attendance', 'Approved'),
+(10, '2023-06-25', '2023-06-28', 'Long weekend', 'Approved');
