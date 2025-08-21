@@ -1,0 +1,279 @@
+# backend_hrd.py
+import psycopg2
+import pandas as pd
+from datetime import date
+
+# Database connection details
+DB_NAME = "hr_exam"
+DB_USER = "postgres"
+DB_PASS = "july@2025"
+DB_HOST = "localhost"
+
+def connect_db():
+    """Establishes a connection to the PostgreSQL database."""
+    try:
+        conn = psycopg2.connect(
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASS,
+            host=DB_HOST
+        )
+        return conn
+    except psycopg2.Error as e:
+        print(f"Error connecting to the database: {e}")
+        return None
+
+# --- CRUD Operations for Employees ---
+
+def create_employee(first_name, last_name, email, phone_number, job_title, start_date, department_id):
+    """Creates a new employee record."""
+    conn = connect_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO Employees (first_name, last_name, email, phone_number, job_title, start_date, department_id) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (first_name, last_name, email, phone_number, job_title, start_date, department_id)
+                )
+                conn.commit()
+            return True
+        except psycopg2.Error as e:
+            print(f"Error creating employee: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+def read_employees(sort_by=None):
+    """Reads and returns all employee records, with optional sorting."""
+    conn = connect_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                query = "SELECT e.employee_id, e.first_name, e.last_name, e.email, e.phone_number, e.job_title, e.start_date, d.department_name FROM Employees e LEFT JOIN Departments d ON e.department_id = d.department_id"
+                
+                if sort_by == 'name':
+                    query += " ORDER BY e.first_name, e.last_name"
+                elif sort_by == 'department':
+                    query += " ORDER BY d.department_name"
+                elif sort_by == 'start_date':
+                    query += " ORDER BY e.start_date"
+                
+                cur.execute(query)
+                columns = [desc[0] for desc in cur.description]
+                employees = cur.fetchall()
+                return pd.DataFrame(employees, columns=columns)
+        except psycopg2.Error as e:
+            print(f"Error reading employees: {e}")
+            return pd.DataFrame()
+        finally:
+            conn.close()
+
+def update_employee(employee_id, first_name, last_name, email, phone_number, job_title, department_id):
+    """Updates an existing employee record."""
+    conn = connect_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE Employees SET first_name = %s, last_name = %s, email = %s, phone_number = %s, job_title = %s, department_id = %s WHERE employee_id = %s",
+                    (first_name, last_name, email, phone_number, job_title, department_id, employee_id)
+                )
+                conn.commit()
+            return True
+        except psycopg2.Error as e:
+            print(f"Error updating employee: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+def delete_employee(employee_id):
+    """Deletes an employee record."""
+    conn = connect_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM Employees WHERE employee_id = %s", (employee_id,))
+                conn.commit()
+            return True
+        except psycopg2.Error as e:
+            print(f"Error deleting employee: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+def search_employees(query):
+    """Searches employee records based on a query."""
+    conn = connect_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT e.employee_id, e.first_name, e.last_name, e.email, e.job_title, d.department_name FROM Employees e LEFT JOIN Departments d ON e.department_id = d.department_id WHERE lower(e.first_name) LIKE %s OR lower(e.last_name) LIKE %s OR lower(d.department_name) LIKE %s OR lower(e.job_title) LIKE %s",
+                    (f"%{query.lower()}%", f"%{query.lower()}%", f"%{query.lower()}%", f"%{query.lower()}%")
+                )
+                columns = [desc[0] for desc in cur.description]
+                employees = cur.fetchall()
+                return pd.DataFrame(employees, columns=columns)
+        except psycopg2.Error as e:
+            print(f"Error searching employees: {e}")
+            return pd.DataFrame()
+        finally:
+            conn.close()
+
+# --- Other CRUD and utility functions (Departments, Reviews, Leaves) would go here following the same pattern ---
+
+def get_all_departments():
+    """Fetches all departments to be used in select boxes."""
+    conn = connect_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT department_id, department_name FROM Departments ORDER BY department_name")
+                departments = cur.fetchall()
+                return departments
+        except psycopg2.Error as e:
+            print(f"Error fetching departments: {e}")
+            return []
+        finally:
+            conn.close()
+
+def create_department(department_name):
+    """Creates a new department."""
+    conn = connect_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO Departments (department_name) VALUES (%s)", (department_name,))
+                conn.commit()
+            return True
+        except psycopg2.Error as e:
+            print(f"Error creating department: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+def read_performance_reviews(sort_by=None):
+    """Reads all performance review records, with optional sorting."""
+    conn = connect_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                query = "SELECT pr.review_id, e.first_name, e.last_name, pr.review_date, pr.review_summary, pr.rating FROM PerformanceReviews pr JOIN Employees e ON pr.employee_id = e.employee_id"
+                
+                if sort_by == 'rating':
+                    query += " ORDER BY pr.rating DESC"
+                
+                cur.execute(query)
+                columns = [desc[0] for desc in cur.description]
+                reviews = cur.fetchall()
+                return pd.DataFrame(reviews, columns=columns)
+        except psycopg2.Error as e:
+            print(f"Error reading performance reviews: {e}")
+            return pd.DataFrame()
+        finally:
+            conn.close()
+
+def create_performance_review(employee_id, review_date, review_summary, rating):
+    """Creates a new performance review."""
+    conn = connect_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO PerformanceReviews (employee_id, review_date, review_summary, rating) VALUES (%s, %s, %s, %s)",
+                            (employee_id, review_date, review_summary, rating))
+                conn.commit()
+            return True
+        except psycopg2.Error as e:
+            print(f"Error creating review: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+def read_leave_requests():
+    """Reads all leave request records."""
+    conn = connect_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT lr.leave_id, e.first_name, e.last_name, lr.start_date, lr.end_date, lr.reason, lr.status FROM LeaveRequests lr JOIN Employees e ON lr.employee_id = e.employee_id ORDER BY lr.start_date DESC")
+                columns = [desc[0] for desc in cur.description]
+                leaves = cur.fetchall()
+                return pd.DataFrame(leaves, columns=columns)
+        except psycopg2.Error as e:
+            print(f"Error reading leave requests: {e}")
+            return pd.DataFrame()
+        finally:
+            conn.close()
+
+def create_leave_request(employee_id, start_date, end_date, reason, status):
+    """Creates a new leave request."""
+    conn = connect_db()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO LeaveRequests (employee_id, start_date, end_date, reason, status) VALUES (%s, %s, %s, %s, %s)",
+                            (employee_id, start_date, end_date, reason, status))
+                conn.commit()
+            return True
+        except psycopg2.Error as e:
+            print(f"Error creating leave request: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+# --- Business Insights Functions ---
+
+def get_insights():
+    """Generates a dictionary of workforce insights."""
+    conn = connect_db()
+    insights = {}
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                # COUNT: Total employees
+                cur.execute("SELECT COUNT(*) FROM Employees")
+                insights['total_employees'] = cur.fetchone()[0]
+
+                # COUNT: Employees per department
+                cur.execute("SELECT d.department_name, COUNT(e.employee_id) FROM Departments d LEFT JOIN Employees e ON d.department_id = e.department_id GROUP BY d.department_name")
+                insights['employees_per_department'] = {row[0]: row[1] for row in cur.fetchall()}
+
+                # SUM: Total leave days taken
+                cur.execute("SELECT SUM(end_date - start_date + 1) FROM LeaveRequests WHERE status = 'Approved'")
+                insights['total_leave_days'] = cur.fetchone()[0] if cur.fetchone()[0] else 0
+
+                # AVG: Average performance rating
+                cur.execute("SELECT AVG(rating) FROM PerformanceReviews")
+                insights['avg_rating'] = round(cur.fetchone()[0], 2) if cur.fetchone()[0] else 0
+
+                # AVG: Average tenure in years
+                cur.execute("SELECT AVG(EXTRACT(EPOCH FROM (NOW() - start_date)) / 31536000) FROM Employees")
+                insights['avg_tenure'] = round(cur.fetchone()[0], 2) if cur.fetchone()[0] else 0
+                
+                # MAX/MIN: Highest/lowest performance score
+                cur.execute("SELECT MAX(rating), MIN(rating) FROM PerformanceReviews")
+                max_rating, min_rating = cur.fetchone()
+                insights['max_rating'] = max_rating if max_rating else 0
+                insights['min_rating'] = min_rating if min_rating else 0
+
+                # MAX/MIN: Departments with max/min employees
+                cur.execute("SELECT d.department_name FROM Departments d JOIN Employees e ON d.department_id = e.department_id GROUP BY d.department_name ORDER BY COUNT(e.employee_id) DESC LIMIT 1")
+                max_dept = cur.fetchone()
+                insights['dept_max_employees'] = max_dept[0] if max_dept else "N/A"
+                
+                cur.execute("SELECT d.department_name FROM Departments d JOIN Employees e ON d.department_id = e.department_id GROUP BY d.department_name ORDER BY COUNT(e.employee_id) ASC LIMIT 1")
+                min_dept = cur.fetchone()
+                insights['dept_min_employees'] = min_dept[0] if min_dept else "N/A"
+
+            return insights
+        except psycopg2.Error as e:
+            print(f"Error generating insights: {e}")
+            return {}
+        finally:
+            conn.close()hr_employee-records_30145
