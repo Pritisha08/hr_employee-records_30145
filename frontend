@@ -1,0 +1,226 @@
+# frontend_hrd.py
+import streamlit as st
+import pandas as pd
+from datetime import date
+from backend_hrd import (
+    create_employee, read_employees, update_employee, delete_employee, search_employees,
+    create_department, get_all_departments,
+    create_performance_review, read_performance_reviews,
+    create_leave_request, read_leave_requests,
+    get_insights
+)
+
+st.set_page_config(layout="wide", page_title="HR Employee Manager")
+
+# Main Page Title
+st.title("Human Resources: Employee Records & Analytics")
+st.subheader("Pritisha_30145")
+
+# --- Tabs for navigation ---
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Employee Management", "Departments", "Performance Reviews", "Leave Requests", "Business Insights"])
+
+with tab1:
+    st.header("Employee Management")
+
+    # --- Employee CRUD Operations ---
+    crud_option = st.radio("Select an action:", ["Add New Employee", "View/Search Employees", "Update Employee", "Delete Employee"])
+
+    if crud_option == "Add New Employee":
+        st.subheader("Add a New Employee")
+        with st.form("new_employee_form"):
+            first_name = st.text_input("First Name")
+            last_name = st.text_input("Last Name")
+            email = st.text_input("Email")
+            phone_number = st.text_input("Phone Number")
+            job_title = st.text_input("Job Title")
+            start_date = st.date_input("Start Date", date.today())
+            
+            departments = get_all_departments()
+            dept_dict = {name: id for id, name in departments}
+            department_name = st.selectbox("Department", [""] + list(dept_dict.keys()))
+            department_id = dept_dict.get(department_name)
+            
+            submitted = st.form_submit_button("Add Employee")
+            if submitted:
+                if first_name and last_name and email and job_title:
+                    if create_employee(first_name, last_name, email, phone_number, job_title, start_date, department_id):
+                        st.success("Employee added successfully!")
+                    else:
+                        st.error("Failed to add employee. The email might already exist.")
+                else:
+                    st.error("Please fill in all required fields.")
+
+    elif crud_option == "View/Search Employees":
+        st.subheader("View & Search Employees")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            search_query = st.text_input("Search by Name, Department, or Job Title")
+        with col2:
+            sort_by = st.selectbox("Sort By", ["None", "Name", "Department", "Start Date"])
+
+        if search_query:
+            employees_df = search_employees(search_query)
+        else:
+            employees_df = read_employees(sort_by.lower().replace(" ", "_"))
+
+        if not employees_df.empty:
+            st.dataframe(employees_df, use_container_width=True)
+        else:
+            st.info("No employees found.")
+
+    elif crud_option == "Update Employee":
+        st.subheader("Update an Employee")
+        employees = read_employees()
+        if not employees.empty:
+            employee_list = employees[['employee_id', 'first_name', 'last_name']].apply(
+                lambda row: f"{row['employee_id']} - {row['first_name']} {row['last_name']}", axis=1).tolist()
+            selected_employee_info = st.selectbox("Select Employee to Update", employee_list)
+            
+            if selected_employee_info:
+                employee_id = int(selected_employee_info.split(' - ')[0])
+                # Fetch details of selected employee (you'd need a backend function for this)
+                # For simplicity, we'll assume we have the data from the 'employees' DataFrame
+                employee_data = employees[employees['employee_id'] == employee_id].iloc[0]
+                
+                with st.form("update_employee_form"):
+                    new_first_name = st.text_input("First Name", value=employee_data['first_name'])
+                    new_last_name = st.text_input("Last Name", value=employee_data['last_name'])
+                    new_email = st.text_input("Email", value=employee_data['email'])
+                    new_phone_number = st.text_input("Phone Number", value=employee_data['phone_number'])
+                    new_job_title = st.text_input("Job Title", value=employee_data['job_title'])
+                    
+                    departments = get_all_departments()
+                    dept_dict = {name: id for id, name in departments}
+                    current_dept_name = employee_data['department_name'] if 'department_name' in employee_data else ''
+                    
+                    new_department_name = st.selectbox("Department", [""] + list(dept_dict.keys()), index=list(dept_dict.keys()).index(current_dept_name) + 1 if current_dept_name else 0)
+                    new_department_id = dept_dict.get(new_department_name)
+                    
+                    update_submitted = st.form_submit_button("Update Employee")
+                    if update_submitted:
+                        if update_employee(employee_id, new_first_name, new_last_name, new_email, new_phone_number, new_job_title, new_department_id):
+                            st.success("Employee updated successfully!")
+                        else:
+                            st.error("Failed to update employee.")
+
+    elif crud_option == "Delete Employee":
+        st.subheader("Delete an Employee")
+        employees = read_employees()
+        if not employees.empty:
+            employee_list = employees[['employee_id', 'first_name', 'last_name']].apply(
+                lambda row: f"{row['employee_id']} - {row['first_name']} {row['last_name']}", axis=1).tolist()
+            employee_to_delete_info = st.selectbox("Select Employee to Delete", [""] + employee_list)
+            
+            if employee_to_delete_info:
+                employee_id_to_delete = int(employee_to_delete_info.split(' - ')[0])
+                if st.button("Confirm Delete"):
+                    if delete_employee(employee_id_to_delete):
+                        st.success("Employee deleted successfully!")
+                        st.experimental_rerun()
+                    else:
+                        st.error("Failed to delete employee.")
+
+with tab2:
+    st.header("Department Management")
+    # Department CRUD here (e.g., add new department)
+    st.subheader("Add New Department")
+    dept_name = st.text_input("Department Name")
+    if st.button("Create Department"):
+        if create_department(dept_name):
+            st.success(f"Department '{dept_name}' created successfully!")
+        else:
+            st.error("Failed to create department. It might already exist.")
+    
+    st.subheader("Current Departments")
+    departments_df = pd.DataFrame(get_all_departments(), columns=['department_id', 'department_name'])
+    st.dataframe(departments_df, use_container_width=True)
+
+with tab3:
+    st.header("Performance Reviews")
+    # Review CRUD here (e.g., add new review)
+    st.subheader("Add New Performance Review")
+    employees = read_employees()
+    if not employees.empty:
+        employee_list = employees[['employee_id', 'first_name', 'last_name']].apply(lambda row: f"{row['employee_id']} - {row['first_name']} {row['last_name']}", axis=1).tolist()
+        selected_employee_info = st.selectbox("Select Employee", [""] + employee_list)
+        if selected_employee_info:
+            employee_id = int(selected_employee_info.split(' - ')[0])
+            review_date = st.date_input("Review Date", date.today())
+            review_summary = st.text_area("Review Summary")
+            rating = st.slider("Rating (1-10)", 1, 10, 5)
+            
+            if st.button("Add Review"):
+                if create_performance_review(employee_id, review_date, review_summary, rating):
+                    st.success("Performance review added successfully!")
+                else:
+                    st.error("Failed to add performance review.")
+    
+    st.subheader("View Performance Reviews")
+    reviews_df = read_performance_reviews()
+    if not reviews_df.empty:
+        st.dataframe(reviews_df, use_container_width=True)
+    else:
+        st.info("No performance reviews found.")
+
+
+with tab4:
+    st.header("Leave Requests")
+    # Leave CRUD here (e.g., add new leave)
+    st.subheader("Add New Leave Request")
+    employees = read_employees()
+    if not employees.empty:
+        employee_list = employees[['employee_id', 'first_name', 'last_name']].apply(lambda row: f"{row['employee_id']} - {row['first_name']} {row['last_name']}", axis=1).tolist()
+        selected_employee_info = st.selectbox("Select Employee", [""] + employee_list, key="leave_employee_select")
+        if selected_employee_info:
+            employee_id = int(selected_employee_info.split(' - ')[0])
+            start_date = st.date_input("Start Date", date.today())
+            end_date = st.date_input("End Date", date.today())
+            reason = st.text_area("Reason for Leave")
+            status = st.selectbox("Status", ["Pending", "Approved", "Denied"])
+            
+            if st.button("Submit Leave Request"):
+                if create_leave_request(employee_id, start_date, end_date, reason, status):
+                    st.success("Leave request submitted successfully!")
+                else:
+                    st.error("Failed to submit leave request.")
+    
+    st.subheader("View Leave Requests")
+    leaves_df = read_leave_requests()
+    if not leaves_df.empty:
+        st.dataframe(leaves_df, use_container_width=True)
+    else:
+        st.info("No leave requests found.")
+        
+with tab5:
+    st.header("Business Insights & Analytics")
+    st.subheader("Workforce Metrics at a Glance")
+    
+    insights = get_insights()
+    
+    if insights:
+        # Using columns for a cleaner layout
+        col_total, col_avg_rating, col_avg_tenure = st.columns(3)
+        col_total.metric("Total Employees", insights.get('total_employees', 'N/A'))
+        col_avg_rating.metric("Average Performance Rating", insights.get('avg_rating', 'N/A'))
+        col_avg_tenure.metric("Average Tenure (Years)", insights.get('avg_tenure', 'N/A'))
+        
+        st.markdown("---")
+        
+        col_max_min_rating, col_leave_days = st.columns(2)
+        with col_max_min_rating:
+            st.metric("Highest/Lowest Rating", f"{insights.get('max_rating', 'N/A')}/{insights.get('min_rating', 'N/A')}")
+        with col_leave_days:
+            st.metric("Total Approved Leave Days", insights.get('total_leave_days', 'N/A'))
+        
+        st.markdown("---")
+        
+        st.subheader("Employees per Department")
+        if insights.get('employees_per_department'):
+            st.bar_chart(insights['employees_per_department'])
+            
+            st.markdown(f"**Department with Most Employees:** {insights.get('dept_max_employees', 'N/A')}")
+            st.markdown(f"**Department with Fewest Employees:** {insights.get('dept_min_employees', 'N/A')}")
+        else:
+            st.info("No department data available for visualization.")
+    else:
+        st.error("Failed to fetch business insights.")
